@@ -324,104 +324,106 @@ def do_task():
             print()
 
 
-        #################
-        # powerpoint    
-        #################
-
-        # Chemin d'accès au modèle PowerPoint
-        template_path = "Bulletin_de_veille_TEMPLATE.pptx"
-
-        # Crée une nouvelle présentation en utilisant le modèle
-
-        presentation = Presentation(template_path)
-
-        slide = presentation.slides[1]  # Supposons que le tableau est sur la première diapositive
-        table = None
-
-        for shape in slide.shapes:
-            if shape.has_table:
-                table = shape.table
-                break
-
-        if table is None:
-            print("Aucun tableau trouvé dans la diapositive.")
-            exit()
-
-        ######################################################
-
-        # Tableau des coordonnées de cellules (lignes et colonnes)
-        cell_coords = [(2, 2), (3, 2), (4, 2), (5, 2), (2, 6), (3, 6), (4, 6), (5, 6), (7, 1), (10, 1)]  # Exemple de coordonnées de cellules (à adapter à votre cas)
-
-        # Tableau des valeurs pour les cellules correspondantes
-        cell_values = [cve_info['attack_vector'], cve_info['attack_complexity'], cve_info['privileges_required'], cve_info['user_interaction'], cve_info['scope'], cve_info['confidentiality_impact'], cve_info['integrity_impact'], cve_info['availability_impact'], cve_info['descriptions'], cve_info['source']]  
-
-        # Get the number of rows and columns in the table
-        num_rows = len(table.rows)
-        num_cols = len(table.columns)
-
-        print("Number of rows:", num_rows)
-        print("Number of columns:", num_cols)
-
-        # Check the cell_coords list
-        for row, col in cell_coords:
-            if row > num_rows or col > num_cols:
-                print(f"Invalid cell coordinate: ({row}, {col})")
-
-        # Boucle pour modifier les cellules et les valeurs
-        for i in range(len(cell_coords)):
-            row, col = cell_coords[i]
-            cell_value = cell_values[i]
-
-            # Modifier le texte dans la cellule de la ligne et colonne spécifiées
-            cell = table.cell(row, col)
-            text_frame = cell.text_frame
-            paragraph = text_frame.paragraphs[0]
-            run = paragraph.add_run()
-
-            # Modifier la mise en forme du texte
-            run.text = cell_value
-            run.font.size = Pt(11)
-            run.font.name = "Poppins"
-            run.font.color.rgb = RGBColor(0, 0, 0)  # Noir
-
-        ######################################################
-
-        # Tableau des coordonnées de cellules (lignes et colonnes)
-        cell_coords = [(0, 1), (2, 8) , (9, 8)]  # Exemple de coordonnées de cellules (à adapter à votre cas)
-
-        # Tableau des valeurs pour les cellules correspondantes
-        cell_values = [cve_info['vector_string'], f"{str(cve_info['severity'])}\n{cve_info['base_severity']}", cve_info['base_severity']]  
-
-        # Boucle pour modifier les cellules et les valeurs
-        for i in range(len(cell_coords)):
-            row, col = cell_coords[i]
-            cell_value = cell_values[i]
-
-            # Modifier le texte dans la cellule de la ligne et colonne spécifiées
-            cell = table.cell(row, col)
-            text_frame = cell.text_frame
-            paragraph = text_frame.paragraphs[0]
-            run = paragraph.add_run()
-
-            # Modifier la mise en forme du texte
-            run.text = cell_value
-            run.font.size = Pt(11)
-            run.font.name = "Poppins"
-            run.font.bold = True  # Pour mettre le texte en gras
-            run.font.color.rgb = RGBColor(255, 255, 255)  # Pour mettre le texte en blanc (255, 255, 255 correspond au blanc en RGB)
-
-        ######################################################
-
-
-        # Enregistrer la présentation modifiée dans un fichier
-        output_path = "nouvelle_presentation.pptx"
-        presentation.save(output_path)
-
+        
 
 
     else:
         print(f'Aucune CVE trouvée pour la plage de dates spécifiée.')
     
+
+def powerpoint():
+    #################
+    # powerpoint    
+    #################
+
+    # Chemin d'accès au modèle PowerPoint
+    template_path = "Bulletin_de_veille_TEMPLATE.pptx"
+
+    # Crée une nouvelle présentation en utilisant le modèle
+
+    presentation = Presentation(template_path)
+
+    slide = presentation.slides[1]  # Supposons que le tableau est sur la première diapositive
+    table = None
+
+    for shape in slide.shapes:
+        if shape.has_table:
+            table = shape.table
+            break
+
+    if table is None:
+        print("Aucun tableau trouvé dans la diapositive.")
+        exit()
+
+    ######################################################
+
+    # Tableau des coordonnées de cellules (lignes et colonnes)
+    cell_coords = [(2, 2), (3, 2), (4, 2), (5, 2), (2, 6), (3, 6), (4, 6), (5, 6), (7, 1), (10, 1)]  # Exemple de coordonnées de cellules (à adapter à votre cas)
+
+    # Tableau des valeurs pour les cellules correspondantes
+    cell_values = [cve_info['attack_vector'], cve_info['attack_complexity'], cve_info['privileges_required'], cve_info['user_interaction'], cve_info['scope'], cve_info['confidentiality_impact'], cve_info['integrity_impact'], cve_info['availability_impact'], cve_info['descriptions'], cve_info['source']]  
+
+    # Get the number of rows and columns in the table
+    num_rows = len(table.rows)
+    num_cols = len(table.columns)
+
+    print("Number of rows:", num_rows)
+    print("Number of columns:", num_cols)
+
+    # Check the cell_coords list
+    for row, col in cell_coords:
+        if row > num_rows or col > num_cols:
+            print(f"Invalid cell coordinate: ({row}, {col})")
+
+    # Boucle pour modifier les cellules et les valeurs
+    for i in range(len(cell_coords)):
+        row, col = cell_coords[i]
+        cell_value = cell_values[i]
+
+        # Modifier le texte dans la cellule de la ligne et colonne spécifiées
+        cell = table.cell(row, col)
+        text_frame = cell.text_frame
+        paragraph = text_frame.paragraphs[0]
+        run = paragraph.add_run()
+
+        # Modifier la mise en forme du texte
+        run.text = cell_value
+        run.font.size = Pt(11)
+        run.font.name = "Poppins"
+        run.font.color.rgb = RGBColor(0, 0, 0)  # Noir
+
+    ######################################################
+
+    # Tableau des coordonnées de cellules (lignes et colonnes)
+    cell_coords = [(0, 1), (2, 8) , (9, 8)]  # Exemple de coordonnées de cellules (à adapter à votre cas)
+
+    # Tableau des valeurs pour les cellules correspondantes
+    cell_values = [cve_info['vector_string'], f"{str(cve_info['severity'])}\n{cve_info['base_severity']}", cve_info['base_severity']]  
+
+    # Boucle pour modifier les cellules et les valeurs
+    for i in range(len(cell_coords)):
+        row, col = cell_coords[i]
+        cell_value = cell_values[i]
+
+        # Modifier le texte dans la cellule de la ligne et colonne spécifiées
+        cell = table.cell(row, col)
+        text_frame = cell.text_frame
+        paragraph = text_frame.paragraphs[0]
+        run = paragraph.add_run()
+
+        # Modifier la mise en forme du texte
+        run.text = cell_value
+        run.font.size = Pt(11)
+        run.font.name = "Poppins"
+        run.font.bold = True  # Pour mettre le texte en gras
+        run.font.color.rgb = RGBColor(255, 255, 255)  # Pour mettre le texte en blanc (255, 255, 255 correspond au blanc en RGB)
+
+    ######################################################
+
+
+    # Enregistrer la présentation modifiée dans un fichier
+    output_path = "nouvelle_presentation.pptx"
+    presentation.save(output_path)
 
 # Fonction principale (main)
 def main():
