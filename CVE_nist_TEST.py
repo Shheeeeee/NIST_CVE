@@ -7,17 +7,17 @@ from pptx import Presentation
 from pptx.util import Pt
 from pptx.dml.color import RGBColor
 from pptx.util import Pt, Inches  # Import the Inches function
+import copy
 
 
 
 
-
-def do_task():
+def CVE():
     # Obtenir la date de début (17 juillet 2023 à 17:58:08)
-    start_datetime = datetime.datetime(2023, 7, 19, 14, 15, 0)
+    start_datetime = datetime.datetime(2023, 7, 1, 00, 00, 0)
 
     # Obtenir la date actuelle comme date de fin (18 juillet 2023 à 17:58:08)
-    end_datetime = datetime.datetime(2023, 7, 19, 14, 16, 0)
+    end_datetime = datetime.datetime(2023, 7, 2, 23, 00, 0)
 
     # Formater les dates dans le format ISO-8061 étendu
     start_date = start_datetime.strftime('%Y-%m-%dT%H:%M:%S.000%z')
@@ -280,27 +280,31 @@ def do_task():
                     descriptions = cve_item['cve']['descriptions'][0]['value']
 
                 # Store all extracted information in a dictionary
-                cve_info = {
-                'cve_id': cve_id,
-                'published': published,
-                'lastModified': lastModified,
-                'vector_string': vector_string,
-                'attack_vector': attack_vector,
-                'attack_complexity': attack_complexity,
-                'privileges_required': privileges_required,
-                'user_interaction': user_interaction,
-                'scope': scope,
-                'confidentiality_impact': confidentiality_impact,
-                'integrity_impact': integrity_impact,
-                'availability_impact': availability_impact,
-                'severity': severity,
-                'base_severity': base_severity,
-                'descriptions': descriptions,
-                'source' : source
-            }
+                try:
+                    cve_info = {
+                    'cve_id': cve_id,
+                    'published': published,
+                    'lastModified': lastModified,
+                    'vector_string': vector_string,
+                    'attack_vector': attack_vector,
+                    'attack_complexity': attack_complexity,
+                    'privileges_required': privileges_required,
+                    'user_interaction': user_interaction,
+                    'scope': scope,
+                    'confidentiality_impact': confidentiality_impact,
+                    'integrity_impact': integrity_impact,
+                    'availability_impact': availability_impact,
+                    'severity': severity,
+                    'base_severity': base_severity,
+                    'descriptions': descriptions,
+                    'source' : source
+                    }
 
-                cve_list.append(cve_info)
-
+                    cve_list.append(cve_info)
+                except Exception as e:
+                    print("Une erreur s'est produite :", e)
+                    continue
+                    
         for cve_info in cve_list:
             print(f"CVE ID: {cve_info['cve_id']}")
             print(f"publiée : {cve_info['published']}  modifiée : {cve_info['lastModified']}")
@@ -323,29 +327,73 @@ def do_task():
             print(f"Source: {cve_info['source']}")
             print()
 
-
-        
-
-
+    
     else:
         print(f'Aucune CVE trouvée pour la plage de dates spécifiée.')
     
+    return cve_list
+    
 
-def powerpoint():
-    #################
-    # powerpoint    
-    #################
-
-    # Chemin d'accès au modèle PowerPoint
+def powerpoint(cve_list):
+    
+    # Le nom du template (modèle) et du fichier de sortie
     template_path = "Bulletin_de_veille_TEMPLATE.pptx"
+    output_filename = "nouvelle_presentation.pptx"
 
-    # Crée une nouvelle présentation en utilisant le modèle
-
+    # Ouvrir le modèle
     presentation = Presentation(template_path)
 
-    slide = presentation.slides[1]  # Supposons que le tableau est sur la première diapositive
-    table = None
+    # Dupliquer la deuxième diapo (index 1) quatre fois
+    for _ in range(len(cve_list) - 1):
+        duplicate_slide(presentation, 1)
 
+    diapo_index = 1  # Commencer à la deuxième diapo (index 1)
+
+    for i in range(len(cve_list)):  # Modifier jusqu'à la cinquième diapo (index 4)
+        slide = presentation.slides[diapo_index]
+        
+        cell_coords = [(2, 2), (3, 2), (4, 2), (5, 2), (2, 6), (3, 6), (4, 6), (5, 6), (7, 1), (10, 1)]  # Exemple de coordonnées de cellules (à adapter à votre cas)
+        cell_values = [cve_list[diapo_index - 1]['attack_vector'], cve_list[diapo_index - 1]['attack_complexity'], cve_list[diapo_index - 1]['privileges_required'], cve_list[diapo_index - 1]['user_interaction'], cve_list[diapo_index - 1]['scope'], cve_list[diapo_index - 1]['confidentiality_impact'], cve_list[diapo_index - 1]['integrity_impact'], cve_list[diapo_index - 1]['availability_impact'], cve_list[diapo_index - 1]['descriptions'], cve_list[diapo_index - 1]['source']]  
+
+        cell_coords2 = [(0, 1), (2, 8) , (9, 8)]  # Exemple de coordonnées de cellules (à adapter à votre cas)
+        cell_values2 = [cve_list[diapo_index - 1]['vector_string'], f"{str(cve_list[diapo_index - 1]['severity'])}\n{cve_list[diapo_index - 1]['base_severity']}", cve_list[diapo_index - 1]['base_severity']]  
+
+
+        for i in range(len(cell_coords)):
+            modify_table_cell_black(slide, cell_coords[i], cell_values[i])
+            
+        for i in range(len(cell_coords2)):
+            modify_table_cell_white(slide, cell_coords2[i], cell_values2[i])
+
+        diapo_index += 1
+
+    # Enregistrer la présentation modifiée dans un fichier
+    presentation.save(output_filename)
+    print(f"La présentation a été sauvegardée dans '{output_filename}' avec succès.")
+
+
+def duplicate_slide(pres, index):
+    try:
+        template = pres.slides[index]
+        blank_slide_layout = template.slide_layout
+    except:
+        blank_slide_layout = pres.slide_layouts[0]
+
+    copied_slide = pres.slides.add_slide(blank_slide_layout)
+
+    for shp in template.shapes:
+        if not shp.has_text_frame or shp.text_frame.text != "":  # Vérifier si la forme contient du texte
+            el = shp.element
+            newel = copy.deepcopy(el)
+            copied_slide.shapes._spTree.insert_element_before(newel, 'p:extLst')
+
+    return copied_slide
+
+
+def modify_table_cell_black(slide, cell_coords, cell_value):
+    row, col = cell_coords
+
+    table = None
     for shape in slide.shapes:
         if shape.has_table:
             table = shape.table
@@ -353,85 +401,52 @@ def powerpoint():
 
     if table is None:
         print("Aucun tableau trouvé dans la diapositive.")
-        exit()
+        return
 
-    ######################################################
+    # Modifier le texte dans la cellule de la ligne et colonne spécifiées
+    cell = table.cell(row, col)
+    text_frame = cell.text_frame
+    paragraph = text_frame.paragraphs[0]
+    run = paragraph.add_run()
 
-    # Tableau des coordonnées de cellules (lignes et colonnes)
-    cell_coords = [(2, 2), (3, 2), (4, 2), (5, 2), (2, 6), (3, 6), (4, 6), (5, 6), (7, 1), (10, 1)]  # Exemple de coordonnées de cellules (à adapter à votre cas)
-
-    # Tableau des valeurs pour les cellules correspondantes
-    cell_values = [cve_info['attack_vector'], cve_info['attack_complexity'], cve_info['privileges_required'], cve_info['user_interaction'], cve_info['scope'], cve_info['confidentiality_impact'], cve_info['integrity_impact'], cve_info['availability_impact'], cve_info['descriptions'], cve_info['source']]  
-
-    # Get the number of rows and columns in the table
-    num_rows = len(table.rows)
-    num_cols = len(table.columns)
-
-    print("Number of rows:", num_rows)
-    print("Number of columns:", num_cols)
-
-    # Check the cell_coords list
-    for row, col in cell_coords:
-        if row > num_rows or col > num_cols:
-            print(f"Invalid cell coordinate: ({row}, {col})")
-
-    # Boucle pour modifier les cellules et les valeurs
-    for i in range(len(cell_coords)):
-        row, col = cell_coords[i]
-        cell_value = cell_values[i]
-
-        # Modifier le texte dans la cellule de la ligne et colonne spécifiées
-        cell = table.cell(row, col)
-        text_frame = cell.text_frame
-        paragraph = text_frame.paragraphs[0]
-        run = paragraph.add_run()
-
-        # Modifier la mise en forme du texte
-        run.text = cell_value
-        run.font.size = Pt(11)
-        run.font.name = "Poppins"
-        run.font.color.rgb = RGBColor(0, 0, 0)  # Noir
-
-    ######################################################
-
-    # Tableau des coordonnées de cellules (lignes et colonnes)
-    cell_coords = [(0, 1), (2, 8) , (9, 8)]  # Exemple de coordonnées de cellules (à adapter à votre cas)
-
-    # Tableau des valeurs pour les cellules correspondantes
-    cell_values = [cve_info['vector_string'], f"{str(cve_info['severity'])}\n{cve_info['base_severity']}", cve_info['base_severity']]  
-
-    # Boucle pour modifier les cellules et les valeurs
-    for i in range(len(cell_coords)):
-        row, col = cell_coords[i]
-        cell_value = cell_values[i]
-
-        # Modifier le texte dans la cellule de la ligne et colonne spécifiées
-        cell = table.cell(row, col)
-        text_frame = cell.text_frame
-        paragraph = text_frame.paragraphs[0]
-        run = paragraph.add_run()
-
-        # Modifier la mise en forme du texte
-        run.text = cell_value
-        run.font.size = Pt(11)
-        run.font.name = "Poppins"
-        run.font.bold = True  # Pour mettre le texte en gras
-        run.font.color.rgb = RGBColor(255, 255, 255)  # Pour mettre le texte en blanc (255, 255, 255 correspond au blanc en RGB)
-
-    ######################################################
+    # Modifier la mise en forme du texte
+    run.text = cell_value
+    run.font.size = Pt(11)
+    run.font.name = "Poppins"
+    run.font.color.rgb = RGBColor(0, 0, 0)  # Noir
 
 
-    # Enregistrer la présentation modifiée dans un fichier
-    output_path = "nouvelle_presentation.pptx"
-    presentation.save(output_path)
+def modify_table_cell_white(slide, cell_coords, cell_value):
+    row, col = cell_coords
 
-# Fonction principale (main)
+    table = None
+    for shape in slide.shapes:
+        if shape.has_table:
+            table = shape.table
+            break
+
+    if table is None:
+        print("Aucun tableau trouvé dans la diapositive.")
+        return
+
+    # Modifier le texte dans la cellule de la ligne et colonne spécifiées
+    cell = table.cell(row, col)
+    text_frame = cell.text_frame
+    paragraph = text_frame.paragraphs[0]
+    run = paragraph.add_run()
+
+    # Modifier la mise en forme du texte
+    run.text = cell_value
+    run.font.size = Pt(11)
+    run.font.name = "Poppins"
+    run.font.bold = True  # Pour mettre le texte en gras
+    run.font.color.rgb = RGBColor(255, 255, 255)  # Pour mettre le texte en blanc (255, 255, 255 correspond au blanc en RGB)
+
 def main():
-    print("Le programme démarre.")
     
     # Appeler la fonction auxiliaire pour effectuer une tâche spécifique
-    do_task()
-    print("Le programme se termine.")
+    cve_list = CVE()
+    powerpoint(cve_list)
 
 
 # Vérifier si le fichier est exécuté en tant que programme principal
