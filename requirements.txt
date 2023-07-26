@@ -1,8 +1,9 @@
-beautifulsoup4==4.12.2
-regex==2023.6.3
-python-pptx==0.6.21
-googletrans==3.0.0
-more-itertools==10.0.0
-threaded==4.1.0
-pytest-shutil==1.7.0 
-os-sys==2.1.4
+bs4
+beautifulsoup4
+regex
+python-pptx
+googletrans
+more-itertools
+threaded
+pytest-shutil 
+os-sys
