@@ -2,6 +2,9 @@ import requests
 import datetime
 from urllib.parse import quote
 import time    
+from bs4 import BeautifulSoup
+import re
+
 
 from pptx import Presentation
 from pptx.util import Pt
@@ -88,6 +91,28 @@ def make_api_request(url, max_attempts=5):
             print(f"Impossible de se connecter à l'API après {max_attempts} tentatives. Veuillez réessayer plus tard.")
             exit()
 
+
+def scrape_website(cve_id):
+    url = f"https://nvd.nist.gov/vuln/detail/{cve_id}"
+    try:
+        response = requests.get(url)
+        response.raise_for_status()
+        soup = BeautifulSoup(response.text, 'html.parser')
+        target_div = soup.find('div', class_='col-lg-3 col-md-5 col-sm-12')
+        content = target_div.text.strip()
+
+        pattern = r"Source:\s+(.+)"
+        match = re.search(pattern, content)
+        source_info = match.group(1)
+
+        return  source_info
+    except requests.exceptions.RequestException as e:
+        print("Error:", e)
+        return None
+    except AttributeError:
+        print("Div not found or website structure changed.")
+        return None
+
 #################################################################################
 #                                    CVE
 #################################################################################
@@ -122,6 +147,9 @@ def CVE(start_date, end_date):
             published = cve_item['cve']['published']
             lastModified = cve_item['cve']['lastModified']
             description = cve_item['cve']['descriptions'][0]['value']
+
+            
+
             severity = None
             for i in range(1, 100): # je recupere la severity de la CVE
                 key = f'cvssMetricV{i}'
@@ -150,6 +178,8 @@ def CVE(start_date, end_date):
             if (severity is not None and severity < 8) or vuln_status == "Rejected" or vuln_status == "Modified" :
                 print(f"Skipping CVE {cve_id} due to low severity or rejected/modified status")
             else:
+                produit = scrape_website(cve_id)
+
                 for i in range(1, 100): # Essayer différentes clés pour extraire le baseScore
                     key = f'cvssMetricV{i}'  # Construire la clé correspondante
                     if key in cve_item['cve']['metrics']:
@@ -317,6 +347,7 @@ def CVE(start_date, end_date):
                 # Store all extracted information in a dictionary
                 
                 cve_info = {
+                'produit': produit,
                 'cve_id': cve_id,
                 'published': published,
                 'lastModified': lastModified,
@@ -341,7 +372,9 @@ def CVE(start_date, end_date):
                 cve_list.append(cve_info)
                                    
         for cve_info in cve_list:
+
             print(f"CVE ID: {cve_info['cve_id']}")
+            print(f"produit: {cve_info['produit']}")
             print(f"publiée : {cve_info['published']}  modifiée : {cve_info['lastModified']}")
 
             print(f"Vuln Status: {vuln_status}")
@@ -403,7 +436,7 @@ def powerpoint(cve_list, start_date, end_date):
         for i in range(len(cell_coords)):
             modify_table_cell_white(slide, cell_coords[i], cell_values[i])
         
-        titre(slide, cve_list[diapo_index - 1]['cve_id'])
+        titre(slide, f"{cve_list[diapo_index - 1]['cve_id']} {cve_list[diapo_index - 1]['produit']}")
 
         diapo_index += 1
 
@@ -582,6 +615,12 @@ def mettre_majuscule_initiale_tout(cve_list):
 
         if cve_info['scope'] == 'Unchanged':
             cve_info['scope'] = "Inchangé"
+        
+        if cve_info['privileges_required'] == 'None':
+            cve_info['privileges_required'] = "Aucuns"
+
+        if cve_info['user_interaction'] == 'None':
+            cve_info['user_interaction'] = "Aucune"
 
     return cve_list
 
@@ -590,19 +629,32 @@ def mettre_majuscule_initiale_tout(cve_list):
 #################################################################################
 
 def plage():
-    A = 2023
-    M = 7
-    J = 25
-    H = 11
+
+    # Obtenir la date d'aujourd'hui
+    aujourdhui = datetime.date.today()
+
+    # Définir un délai (timedelta) de 1 jour
+    un_jour = datetime.timedelta(days=1)
+
+    # Obtenir la date d'hier
+    hier = aujourdhui - un_jour
+
+    # Extraire le jour en tant qu'entier
+    jour_hier = hier.day
+
+    A = aujourdhui.year
+    M = aujourdhui.month
+    J = jour_hier
+    H = 9
     MIN = 00
     S = 00
 
-    A2 = 2023
-    M2 = 7
-    J2 = 26
-    H2 = 11
-    MIN2 = 00
-    S2 = 00
+    A2 = aujourdhui.year
+    M2 = aujourdhui.month
+    J2 = aujourdhui.day
+    H2 = 8
+    MIN2 = 59
+    S2 = 59
 
     start_datetime = datetime.datetime(A, M, J, H, MIN, S)
     end_datetime = datetime.datetime(A2, M2, J2, H2, MIN2, S2)
