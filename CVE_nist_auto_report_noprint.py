@@ -131,7 +131,6 @@ def CVE(start_date, end_date):
                     key = f'cvssMetricV{i}'  # Construire la clé correspondante
                     if key in cve_item['cve']['metrics']:
                         cve_metrics = cve_item['cve']['metrics'][key][0]
-                        
                         #################
                         # vectorString
                         #################
