@@ -43,6 +43,7 @@ def modify_table_cell(slide, row, col, cell_value):
     run.font.name = "Poppins"
     run.font.color.rgb = RGBColor(0, 0, 0)  # Noir
 
+
 def main():
     # Le nom du template (modèle) et du fichier de sortie
     template_path = "duplication.pptx"

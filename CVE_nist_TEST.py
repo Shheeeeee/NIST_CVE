@@ -9,47 +9,102 @@ from pptx.dml.color import RGBColor
 from pptx.util import Pt, Inches  # Import the Inches function
 import copy
 
+from googletrans import Translator
 
+from itertools import cycle
+from shutil import get_terminal_size
+from threading import Thread
+from time import sleep
+from sys import stdout
 
+#################################################################################
+#                                 ANIMATION
+#################################################################################
 
-def CVE():
-    # Obtenir la date de début (17 juillet 2023 à 17:58:08)
-    start_datetime = datetime.datetime(2023, 7, 1, 00, 00, 0)
+class Loader:
+    def __init__(self, desc="Tentative de connexion ", end="", timeout=0.1):
+        self.desc = desc
+        self.end = end
+        self.timeout = timeout
 
-    # Obtenir la date actuelle comme date de fin (18 juillet 2023 à 17:58:08)
-    end_datetime = datetime.datetime(2023, 7, 2, 23, 00, 0)
+        self._thread = Thread(target=self._animate, daemon=True)
+        self.steps = ["⢿", "⣻", "⣽", "⣾", "⣷", "⣯", "⣟", "⡿"]
+        self.done = False
 
-    # Formater les dates dans le format ISO-8061 étendu
-    start_date = start_datetime.strftime('%Y-%m-%dT%H:%M:%S.000%z')
-    end_date = end_datetime.strftime('%Y-%m-%dT%H:%M:%S.000%z')
+    def start(self):
+        self._thread.start()
+        return self
+
+    def _animate(self):
+        for c in cycle(self.steps):
+            if self.done:
+                break
+            text = f"{self.desc}{self.attempt} {c}"
+            print(f"\r{text}", flush=True, end="")
+            stdout.flush()
+            time.sleep(self.timeout)
+
+    def __enter__(self):
+        self.start()
+
+    def stop(self):
+        self.done = True
+        cols = get_terminal_size((80, 20)).columns
+        print("\r" + " " * cols, end="", flush=True)
+        print(f"\r{self.end}", flush=True)
+
+    def set_attempt(self, attempt):
+        self.attempt = attempt
+
+    def __exit__(self, exc_type, exc_value, tb):
+        self.stop()
+
+#################################################################################
+#                                 API CALL
+#################################################################################
+
+def make_api_request(url, max_attempts=5):
+    loader = Loader()
+    loader_thread = Thread(target=loader.start, daemon=True)
+    loader_thread.start()
+
+    try:
+        for attempt in range(1, max_attempts + 1):
+            loader.set_attempt(attempt)
+            #print(f"Connexion à l'API en cours...", end="")
+
+            response = requests.get(url)
+
+            if response.status_code == 200:
+                data = response.json()
+                loader.stop()
+                print("\nConnexion réussie !")
+                return data
+
+            time.sleep(6)
+    finally:
+        loader.stop()
+        if attempt == max_attempts:
+            print(f"Impossible de se connecter à l'API après {max_attempts} tentatives. Veuillez réessayer plus tard.")
+            exit()
+
+#################################################################################
+#                                    CVE
+#################################################################################
+
+def CVE(start_date, end_date):
 
     # Encoder les caractères spéciaux dans les dates
-    encoded_start_date = quote(start_date)
-    encoded_end_date = quote(end_date)
+
 
     # URL de l'API du NIST pour les CVE avec les dates de début et de fin spécifiées
     # url = f'https://services.nvd.nist.gov/rest/json/cves/2.0/?lastModStartDate={encoded_start_date}&lastModEndDate={encoded_end_date}'
-    url = f'https://services.nvd.nist.gov/rest/json/cves/2.0/?pubStartDate={encoded_start_date}&pubEndDate={encoded_end_date}'
+    url = f'https://services.nvd.nist.gov/rest/json/cves/2.0/?pubStartDate={start_date}&pubEndDate={end_date}'
 
     # Nombre maximal de tentatives
-    max_attempts = 5
 
-    # Faire la requête GET à l'API avec gestion des erreurs
-    for attempt in range(1, max_attempts + 1):
-        print(f"Connexion à l'API en cours... Tentative {attempt}")
-        response = requests.get(url)
+    data = make_api_request(url)
 
-        if response.status_code == 200:
-            data = response.json()
-            print("Connexion réussie !")
-            break
-
-        # Attendre quelques secondes avant la prochaine tentative
-        time.sleep(3)
-    else:
-        print("Impossible de se connecter à l'API après plusieurs tentatives. Veuillez réessayer plus tard.")
-        exit()
-    # ...
 
     if len(data) != 0:
         cve_items = data['vulnerabilities']
@@ -122,12 +177,30 @@ def CVE():
                         cve_metrics = cve_item['cve']['metrics'][key][0]
                         
                         
+
+                        # metrics = [cve_metrics['vectorString'], cve_metrics['attackVector'], cve_metrics['attackComplexity'], cve_metrics['privilegesRequired'], cve_metrics['userInteraction'], cve_metrics['scope'], cve_metrics['confidentialityImpact'], cve_metrics['integrityImpact'], cve_metrics['availabilityImpact'], cve_metrics['baseSeverity']]
+                        # metrics2 = [cve_metrics['cvssData']['vectorString'], cve_metrics['cvssData']['attackVector'], cve_metrics['cvssData']['attackComplexity'], cve_metrics['cvssData']['privilegesRequired'], cve_metrics['cvssData']['userInteraction'], cve_metrics['cvssData']['scope'], cve_metrics['cvssData']['confidentialityImpact'], cve_metrics['cvssData']['integrityImpact'], cve_metrics['cvssData']['availabilityImpact'], cve_metrics['cvssData']['baseSeverity']]
+                        # metrics3 = ['vectorString', 'attackVector', 'attackComplexity', 'privilegesRequired', 'userInteraction', 'scope', 'confidentialityImpact', 'integrityImpact', 'availabilityImpact', 'baseSeverity']
+                        # for i in range(len(metrics)):
+                        #     try:
+                        #         # Essayer d'accéder à 'vectorString' dans cve_item['cve']['metrics'][key][0]['cvssData']
+                        #         metrics3[i] = metrics[i]
+                        #     except KeyError:
+                        #         try:
+                        #             # Essayer d'accéder à 'attackVector' dans cve_item['cve']['metrics'][key][0]['cvssData']
+                        #             metrics3[i] = metrics2[i]
+                        #         except KeyError:
+                        #             # Si 'attackVector' n'existe pas, définir attack_vector comme None
+                        #             vector_string = None
+
+
+
                         #################
                         # vectorString
                         #################
                         try:
                             # Essayer d'accéder à 'vectorString' dans cve_item['cve']['metrics'][key][0]['cvssData']
-                            vector_string = cve_metrics['cvssData']['vectorString']
+                            vector_string = cve_metrics['vectorString']
                         except KeyError:
                             try:
                                 # Essayer d'accéder à 'attackVector' dans cve_item['cve']['metrics'][key][0]['cvssData']
@@ -333,12 +406,14 @@ def CVE():
     
     return cve_list
     
+#################################################################################
+#                                 POWERPOINT
+#################################################################################
 
-def powerpoint(cve_list):
+def powerpoint(cve_list, start_date, end_date):
     
     # Le nom du template (modèle) et du fichier de sortie
     template_path = "Bulletin_de_veille_TEMPLATE.pptx"
-    output_filename = "nouvelle_presentation.pptx"
 
     # Ouvrir le modèle
     presentation = Presentation(template_path)
@@ -352,25 +427,44 @@ def powerpoint(cve_list):
     for i in range(len(cve_list)):  # Modifier jusqu'à la cinquième diapo (index 4)
         slide = presentation.slides[diapo_index]
         
-        cell_coords = [(2, 2), (3, 2), (4, 2), (5, 2), (2, 6), (3, 6), (4, 6), (5, 6), (7, 1), (10, 1)]  # Exemple de coordonnées de cellules (à adapter à votre cas)
+        cell_coords = [(2, 2), (3, 2), (4, 2), (5, 2), (2, 5), (3, 5), (4, 5), (5, 5), (7, 1), (10, 1)] 
         cell_values = [cve_list[diapo_index - 1]['attack_vector'], cve_list[diapo_index - 1]['attack_complexity'], cve_list[diapo_index - 1]['privileges_required'], cve_list[diapo_index - 1]['user_interaction'], cve_list[diapo_index - 1]['scope'], cve_list[diapo_index - 1]['confidentiality_impact'], cve_list[diapo_index - 1]['integrity_impact'], cve_list[diapo_index - 1]['availability_impact'], cve_list[diapo_index - 1]['descriptions'], cve_list[diapo_index - 1]['source']]  
-
-        cell_coords2 = [(0, 1), (2, 8) , (9, 8)]  # Exemple de coordonnées de cellules (à adapter à votre cas)
-        cell_values2 = [cve_list[diapo_index - 1]['vector_string'], f"{str(cve_list[diapo_index - 1]['severity'])}\n{cve_list[diapo_index - 1]['base_severity']}", cve_list[diapo_index - 1]['base_severity']]  
-
 
         for i in range(len(cell_coords)):
             modify_table_cell_black(slide, cell_coords[i], cell_values[i])
             
-        for i in range(len(cell_coords2)):
-            modify_table_cell_white(slide, cell_coords2[i], cell_values2[i])
+        cell_coords = [(0, 1), (2, 7) , (9, 7)]  
+        cell_values = [cve_list[diapo_index - 1]['vector_string'], f"{str(cve_list[diapo_index - 1]['severity'])}\n{cve_list[diapo_index - 1]['base_severity']}", cve_list[diapo_index - 1]['base_severity']]  
+
+        for i in range(len(cell_coords)):
+            modify_table_cell_white(slide, cell_coords[i], cell_values[i])
+        
+        titre(slide, cve_list[diapo_index - 1]['cve_id'])
 
         diapo_index += 1
 
     # Enregistrer la présentation modifiée dans un fichier
-    presentation.save(output_filename)
-    print(f"La présentation a été sauvegardée dans '{output_filename}' avec succès.")
+    nom_fichier = "CERT - Bulletin_de_veille_" + end_date + ".pptx"
+    presentation.save(nom_fichier)
+    print(f"La présentation a été sauvegardée dans '{nom_fichier}' avec succès.")
 
+def titre(slide, titre):
+    title_shape = slide.shapes.title
+
+    # Modifiez le texte du titre
+
+    title_shape.text = titre
+
+    # Définir le style du texte du titre
+    font = title_shape.text_frame.paragraphs[0].font
+    font.name = "Poppins SemiBold"
+    #font.bold = True
+    font.size = Pt(36)
+
+    left = Pt(55)  # Définir la position horizontale (gauche) en points
+    top = Pt(90)   # Définir la position verticale (haut) en points
+    title_shape.left = left
+    title_shape.top = top
 
 def duplicate_slide(pres, index):
     try:
@@ -392,7 +486,6 @@ def duplicate_slide(pres, index):
 
 def modify_table_cell_black(slide, cell_coords, cell_value):
     row, col = cell_coords
-
     table = None
     for shape in slide.shapes:
         if shape.has_table:
@@ -410,7 +503,7 @@ def modify_table_cell_black(slide, cell_coords, cell_value):
     run = paragraph.add_run()
 
     # Modifier la mise en forme du texte
-    run.text = cell_value
+    run.text = str(cell_value)
     run.font.size = Pt(11)
     run.font.name = "Poppins"
     run.font.color.rgb = RGBColor(0, 0, 0)  # Noir
@@ -436,19 +529,140 @@ def modify_table_cell_white(slide, cell_coords, cell_value):
     run = paragraph.add_run()
 
     # Modifier la mise en forme du texte
-    run.text = cell_value
+    run.text = str(cell_value)
     run.font.size = Pt(11)
     run.font.name = "Poppins"
     run.font.bold = True  # Pour mettre le texte en gras
     run.font.color.rgb = RGBColor(255, 255, 255)  # Pour mettre le texte en blanc (255, 255, 255 correspond au blanc en RGB)
 
+
+#################################################################################
+#                                 TRADUCTION
+#################################################################################
+
+def traduire_en_francais(texte):
+    translator = Translator()
+    try:
+        traduction = translator.translate(texte, src='en', dest='fr')
+        return traduction.text
+    except:
+        return texte
+
+def traduire_donnees_en_francais(cve_list):
+    for cve_info in cve_list:
+        cve_info['base_severity'] = traduire_en_francais(str(cve_info['base_severity']))
+        cve_info['attack_vector'] = traduire_en_francais(str(cve_info['attack_vector']))
+        cve_info['attack_complexity'] = traduire_en_francais(str(cve_info['attack_complexity']))
+        cve_info['privileges_required'] = traduire_en_francais(str(cve_info['privileges_required']))
+        cve_info['user_interaction'] = traduire_en_francais(str(cve_info['user_interaction']))
+        cve_info['scope'] = traduire_en_francais(str(cve_info['scope']))
+        cve_info['confidentiality_impact'] = traduire_en_francais(str(cve_info['confidentiality_impact']))
+        cve_info['integrity_impact'] = traduire_en_francais(str(cve_info['integrity_impact']))
+        cve_info['availability_impact'] = traduire_en_francais(str(cve_info['availability_impact']))
+        cve_info['descriptions'] = traduire_en_francais(str(cve_info['descriptions']))
+
+    return cve_list
+
+#################################################################################
+#                              MISE EN FORME
+#################################################################################
+
+def mettre_majuscule_initiale(chaine):
+    # Convertir la chaîne en minuscules
+    chaine_minuscules = chaine.lower()
+    # Mettre en majuscule la première lettre
+    chaine_majuscule_initiale = chaine_minuscules.capitalize()
+    return chaine_majuscule_initiale
+
+def mettre_majuscule_initiale_tout(cve_list):
+    for cve_info in cve_list:
+        cve_info['base_severity'] = mettre_majuscule_initiale(str(cve_info['base_severity']))
+        cve_info['attack_vector'] = mettre_majuscule_initiale(str(cve_info['attack_vector']))
+        cve_info['attack_complexity'] = mettre_majuscule_initiale(str(cve_info['attack_complexity']))
+        cve_info['privileges_required'] = mettre_majuscule_initiale(str(cve_info['privileges_required']))
+        cve_info['user_interaction'] = mettre_majuscule_initiale(str(cve_info['user_interaction']))
+        cve_info['scope'] = mettre_majuscule_initiale(str(cve_info['scope']))
+        cve_info['confidentiality_impact'] = mettre_majuscule_initiale(str(cve_info['confidentiality_impact']))
+        cve_info['integrity_impact'] = mettre_majuscule_initiale(str(cve_info['integrity_impact']))
+        cve_info['availability_impact'] = mettre_majuscule_initiale(str(cve_info['availability_impact']))
+        cve_info['descriptions'] = mettre_majuscule_initiale(str(cve_info['descriptions']))
+
+    for cve_info in cve_list:
+        if cve_info['base_severity'] == 'Haut':
+            cve_info['base_severity'] = "Élevée"
+
+        if cve_info['attack_complexity'] == 'Haut':
+            cve_info['attack_complexity'] = "Élevée"
+        
+        if cve_info['privileges_required'] == 'Haut':
+            cve_info['privileges_required'] = "Élevés"
+
+        if cve_info['user_interaction'] == 'Aucun':
+            cve_info['user_interaction'] = "Aucune"
+
+        if cve_info['confidentiality_impact'] == 'Haut':
+            cve_info['confidentiality_impact'] = "Élevée"
+
+        if cve_info['integrity_impact'] == 'Haut':
+            cve_info['integrity_impact'] = "Élevée"
+        
+        if cve_info['availability_impact'] == 'Haut':
+            cve_info['availability_impact'] = "Élevée"
+
+        if cve_info['scope'] == 'Unchanged':
+            cve_info['scope'] = "Inchangé"
+
+    return cve_list
+
+#################################################################################
+#                              PLAGE HORAIRE
+#################################################################################
+
+def plage():
+    A = 2023
+    M = 7
+    J = 24
+    H = 12
+    MIN = 00
+    S = 00
+
+    A2 = 2023
+    M2 = 7
+    J2 = 25
+    H2 = 12
+    MIN2 = 00
+    S2 = 00
+
+    start_datetime = datetime.datetime(A, M, J, H, MIN, S)
+    end_datetime = datetime.datetime(A2, M2, J2, H2, MIN2, S2)
+
+    start_date = start_datetime.strftime('%Y-%m-%dT%H:%M:%S.000%z')
+    end_date = end_datetime.strftime('%Y-%m-%dT%H:%M:%S.000%z')
+
+    start_date2 = start_datetime.strftime("%Y%m%d")
+    end_date2 = end_datetime.strftime("%Y%m%d")
+
+    encoded_start_date = quote(start_date)
+    encoded_end_date = quote(end_date)
+
+    return encoded_start_date, encoded_end_date, start_date2, end_date2
+
+
 def main():
-    
-    # Appeler la fonction auxiliaire pour effectuer une tâche spécifique
-    cve_list = CVE()
-    powerpoint(cve_list)
+    #definir les dates de début et de fin
+    start_date, end_date, start_date2, end_date2 = plage()
 
+    # récupérer les CVE dans un tableau
+    cve_list = CVE(start_date, end_date)
 
-# Vérifier si le fichier est exécuté en tant que programme principal
+    # Traduire tout les champs en anglais
+    #cve_list = traduire_donnees_en_francais(cve_list)
+
+    # mise en forme des valeurs
+    cve_list = mettre_majuscule_initiale_tout(cve_list)
+
+    # création du powerpoint
+    powerpoint(cve_list, start_date2, end_date2)
+
 if __name__ == "__main__":
     main()
