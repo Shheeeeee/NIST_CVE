@@ -1,0 +1,8 @@
+pip install beautifulsoup4==4.12.2
+pip install regex==2023.6.3
+pip install python-pptx==0.6.21
+pip install googletrans==3.0.0
+pip install more-itertools==10.0.0
+pip install threaded==4.1.0
+pip install pytest-shutil==1.7.0 
+pip install os-sys==2.1.4
