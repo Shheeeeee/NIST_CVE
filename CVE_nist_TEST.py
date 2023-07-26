@@ -28,7 +28,7 @@ class Loader:
         self.timeout = timeout
 
         self._thread = Thread(target=self._animate, daemon=True)
-        self.steps = ["⢿", "⣻", "⣽", "⣾", "⣷", "⣯", "⣟", "⡿"]
+        self.steps = ["⢿ ", "⣻ ", "⣽ ", "⣾ ", "⣷ ", "⣯ ", "⣟ ", "⡿ "]
         self.done = False
 
     def start(self):
@@ -112,11 +112,18 @@ def CVE(start_date, end_date):
         
         # Parcourir chaque CVE et extraire les informations
         for cve_item in cve_items:
-            # Extract the severity (baseScore)
-            cve_id = cve_item['cve']['id']
 
+            #################
+            # Récupération des inforamtions de base
+            #################
+
+            cve_id = cve_item['cve']['id']
+            vuln_status = cve_item['cve']['vulnStatus']
+            published = cve_item['cve']['published']
+            lastModified = cve_item['cve']['lastModified']
+            description = cve_item['cve']['descriptions'][0]['value']
             severity = None
-            for i in range(1, 100):
+            for i in range(1, 100): # je recupere la severity de la CVE
                 key = f'cvssMetricV{i}'
                 if key in cve_item['cve']['metrics']:
                     cve_metrics = cve_item['cve']['metrics'][key][0]
@@ -124,6 +131,7 @@ def CVE(start_date, end_date):
                     #################
                     # severity
                     #################
+
                     try:
                         severity = cve_metrics['baseScore']
                     except KeyError:
@@ -135,66 +143,18 @@ def CVE(start_date, end_date):
                             severity = None
                         continue
 
-            # Print severity for debugging purposes
-            if severity is None:
-                print(f"Severity not found for CVE: {cve_item['cve']['id']}")
+            #################
+            # Tri des CVE, ne prends que les CVE avec plus de 8 de score et des status autres que Rejected et modified (qui sont les CVE non acceptés ou doublons par rapport à une ancienne)
+            #################
 
-
-            # Skip processing the CVE if severity is less than 8
-            if (severity is not None and severity < 8) or cve_item['cve']['vulnStatus'] == "Rejected" or cve_item['cve']['vulnStatus'] == "Modified":
+            if (severity is not None and severity < 8) or vuln_status == "Rejected" or vuln_status == "Modified" :
                 print(f"Skipping CVE {cve_id} due to low severity or rejected/modified status")
-                continue
-
-            cve_id = cve_item['cve']['id']
-            vuln_status = cve_item['cve']['vulnStatus']
-
-            # Initialize variables to store extracted information
-            attack_vector = None
-            vector_string = None
-            descriptions = []
-            
-            
-            # If vulnStatus is "Undergoing Analysis", et "severity" == None only extract and print descriptions
-            if vuln_status == "Undergoing Analysis" and severity == None:
-                if 'descriptions' in cve_item['cve']:
-                    descriptions_data = cve_item['cve']['descriptions']
-                    for description in descriptions_data:
-                        descriptions.append(description['value'])
-
-                print(f"CVE ID: {cve_id}")
-                print(f"Vuln Status: {vuln_status}")
-                print(f"Descriptions: {descriptions}")
-                print()
-
-                #################
-                # il faut chercher des mots clefs dans la description tel que RCE, ...
-                #################
-
             else:
                 for i in range(1, 100): # Essayer différentes clés pour extraire le baseScore
                     key = f'cvssMetricV{i}'  # Construire la clé correspondante
                     if key in cve_item['cve']['metrics']:
                         cve_metrics = cve_item['cve']['metrics'][key][0]
                         
-                        
-
-                        # metrics = [cve_metrics['vectorString'], cve_metrics['attackVector'], cve_metrics['attackComplexity'], cve_metrics['privilegesRequired'], cve_metrics['userInteraction'], cve_metrics['scope'], cve_metrics['confidentialityImpact'], cve_metrics['integrityImpact'], cve_metrics['availabilityImpact'], cve_metrics['baseSeverity']]
-                        # metrics2 = [cve_metrics['cvssData']['vectorString'], cve_metrics['cvssData']['attackVector'], cve_metrics['cvssData']['attackComplexity'], cve_metrics['cvssData']['privilegesRequired'], cve_metrics['cvssData']['userInteraction'], cve_metrics['cvssData']['scope'], cve_metrics['cvssData']['confidentialityImpact'], cve_metrics['cvssData']['integrityImpact'], cve_metrics['cvssData']['availabilityImpact'], cve_metrics['cvssData']['baseSeverity']]
-                        # metrics3 = ['vectorString', 'attackVector', 'attackComplexity', 'privilegesRequired', 'userInteraction', 'scope', 'confidentialityImpact', 'integrityImpact', 'availabilityImpact', 'baseSeverity']
-                        # for i in range(len(metrics)):
-                        #     try:
-                        #         # Essayer d'accéder à 'vectorString' dans cve_item['cve']['metrics'][key][0]['cvssData']
-                        #         metrics3[i] = metrics[i]
-                        #     except KeyError:
-                        #         try:
-                        #             # Essayer d'accéder à 'attackVector' dans cve_item['cve']['metrics'][key][0]['cvssData']
-                        #             metrics3[i] = metrics2[i]
-                        #         except KeyError:
-                        #             # Si 'attackVector' n'existe pas, définir attack_vector comme None
-                        #             vector_string = None
-
-
-
                         #################
                         # vectorString
                         #################
@@ -339,45 +299,47 @@ def CVE(start_date, end_date):
                         # source    
                         #################
                         try:
-                            # Essayer d'accéder à 'attackVector' dans cve_item['cve']['metrics'][key][0]
                             source = cve_item['cve']['references'][0]['url']
-                        except KeyError:
+                        except Exception as e:
                             source = None
 
+                        try:
+                            source2 = cve_item['cve']['references'][1]['url']
+                        except Exception as e:
+                            source2 = None
                         
-                        published = cve_item['cve']['published']
-                        lastModified = cve_item['cve']['lastModified']
-
-                # Extract 'descriptions'
-                if 'descriptions' in cve_item['cve']:
-                    descriptions = cve_item['cve']['descriptions'][0]['value']
+                        try:
+                            # Essayer d'accéder à 'attackVector' dans cve_item['cve']['metrics'][key][0]
+                            source3 = cve_item['cve']['references'][2]['url']
+                        except Exception as e:
+                            source3 = None
 
                 # Store all extracted information in a dictionary
-                try:
-                    cve_info = {
-                    'cve_id': cve_id,
-                    'published': published,
-                    'lastModified': lastModified,
-                    'vector_string': vector_string,
-                    'attack_vector': attack_vector,
-                    'attack_complexity': attack_complexity,
-                    'privileges_required': privileges_required,
-                    'user_interaction': user_interaction,
-                    'scope': scope,
-                    'confidentiality_impact': confidentiality_impact,
-                    'integrity_impact': integrity_impact,
-                    'availability_impact': availability_impact,
-                    'severity': severity,
-                    'base_severity': base_severity,
-                    'descriptions': descriptions,
-                    'source' : source
-                    }
+                
+                cve_info = {
+                'cve_id': cve_id,
+                'published': published,
+                'lastModified': lastModified,
+                'vector_string': vector_string,
+                'attack_vector': attack_vector,
+                'attack_complexity': attack_complexity,
+                'privileges_required': privileges_required,
+                'user_interaction': user_interaction,
+                'scope': scope,
+                'confidentiality_impact': confidentiality_impact,
+                'integrity_impact': integrity_impact,
+                'availability_impact': availability_impact,
+                'severity': severity,
+                'base_severity': base_severity,
+                'descriptions': description,
+                'source' : source,
+                'source2' : source2,
+                'source3' : source3
 
-                    cve_list.append(cve_info)
-                except Exception as e:
-                    print("Une erreur s'est produite :", e)
-                    continue
-                    
+                }
+
+                cve_list.append(cve_info)
+                                   
         for cve_info in cve_list:
             print(f"CVE ID: {cve_info['cve_id']}")
             print(f"publiée : {cve_info['published']}  modifiée : {cve_info['lastModified']}")
@@ -421,14 +383,16 @@ def powerpoint(cve_list, start_date, end_date):
     # Dupliquer la deuxième diapo (index 1) quatre fois
     for _ in range(len(cve_list) - 1):
         duplicate_slide(presentation, 1)
-
+    
     diapo_index = 1  # Commencer à la deuxième diapo (index 1)
-
+    
     for i in range(len(cve_list)):  # Modifier jusqu'à la cinquième diapo (index 4)
         slide = presentation.slides[diapo_index]
+
+        cve_list[diapo_index - 1]['source2'], cve_list[diapo_index - 1]['source3'] = source_forme(cve_list[diapo_index - 1]['source2'], cve_list[diapo_index - 1]['source3'])
         
         cell_coords = [(2, 2), (3, 2), (4, 2), (5, 2), (2, 5), (3, 5), (4, 5), (5, 5), (7, 1), (10, 1)] 
-        cell_values = [cve_list[diapo_index - 1]['attack_vector'], cve_list[diapo_index - 1]['attack_complexity'], cve_list[diapo_index - 1]['privileges_required'], cve_list[diapo_index - 1]['user_interaction'], cve_list[diapo_index - 1]['scope'], cve_list[diapo_index - 1]['confidentiality_impact'], cve_list[diapo_index - 1]['integrity_impact'], cve_list[diapo_index - 1]['availability_impact'], cve_list[diapo_index - 1]['descriptions'], cve_list[diapo_index - 1]['source']]  
+        cell_values = [cve_list[diapo_index - 1]['attack_vector'], cve_list[diapo_index - 1]['attack_complexity'], cve_list[diapo_index - 1]['privileges_required'], cve_list[diapo_index - 1]['user_interaction'], cve_list[diapo_index - 1]['scope'], cve_list[diapo_index - 1]['confidentiality_impact'], cve_list[diapo_index - 1]['integrity_impact'], cve_list[diapo_index - 1]['availability_impact'], cve_list[diapo_index - 1]['descriptions'], f"{str(cve_list[diapo_index - 1]['source'])}\n{cve_list[diapo_index - 1]['source2']}\n{cve_list[diapo_index - 1]['source3']}"]  
 
         for i in range(len(cell_coords)):
             modify_table_cell_black(slide, cell_coords[i], cell_values[i])
@@ -447,6 +411,13 @@ def powerpoint(cve_list, start_date, end_date):
     nom_fichier = "CERT - Bulletin_de_veille_" + end_date + ".pptx"
     presentation.save(nom_fichier)
     print(f"La présentation a été sauvegardée dans '{nom_fichier}' avec succès.")
+
+def source_forme(source2, source3):
+    if source2 == None:
+        source2 = ""
+    if source3 == None:
+        source3 = ""
+    return source2, source3
 
 def titre(slide, titre):
     title_shape = slide.shapes.title
@@ -621,15 +592,15 @@ def mettre_majuscule_initiale_tout(cve_list):
 def plage():
     A = 2023
     M = 7
-    J = 24
-    H = 12
+    J = 25
+    H = 11
     MIN = 00
     S = 00
 
     A2 = 2023
     M2 = 7
-    J2 = 25
-    H2 = 12
+    J2 = 26
+    H2 = 11
     MIN2 = 00
     S2 = 00
 
