@@ -461,85 +461,151 @@ def modify_table_cell_white(slide, cell_coords, cell_value):
 #                                 TRADUCTION
 #################################################################################
 
-def traduire_en_francais(texte):
-    translator = Translator()
-    try:
-        traduction = translator.translate(texte, src='en', dest='fr')
-        return traduction.text
-    except:
-        return texte
+# def traduire_en_francais(texte):
+#     translator = Translator()
+#     try:
+#         traduction = translator.translate(texte, src='en', dest='fr')
+#         return traduction.text
+#     except:
+#         return texte
 
-def traduire_donnees_en_francais(cve_list):
-    for cve_info in cve_list:
-        cve_info['base_severity'] = traduire_en_francais(str(cve_info['base_severity']))
-        cve_info['attack_vector'] = traduire_en_francais(str(cve_info['attack_vector']))
-        cve_info['attack_complexity'] = traduire_en_francais(str(cve_info['attack_complexity']))
-        cve_info['privileges_required'] = traduire_en_francais(str(cve_info['privileges_required']))
-        cve_info['user_interaction'] = traduire_en_francais(str(cve_info['user_interaction']))
-        cve_info['scope'] = traduire_en_francais(str(cve_info['scope']))
-        cve_info['confidentiality_impact'] = traduire_en_francais(str(cve_info['confidentiality_impact']))
-        cve_info['integrity_impact'] = traduire_en_francais(str(cve_info['integrity_impact']))
-        cve_info['availability_impact'] = traduire_en_francais(str(cve_info['availability_impact']))
-        cve_info['descriptions'] = traduire_en_francais(str(cve_info['descriptions']))
+# def traduire_donnees_en_francais(cve_list):
+#     for cve_info in cve_list:
+#         cve_info['base_severity'] = traduire_en_francais(str(cve_info['base_severity']))
+#         cve_info['attack_vector'] = traduire_en_francais(str(cve_info['attack_vector']))
+#         cve_info['attack_complexity'] = traduire_en_francais(str(cve_info['attack_complexity']))
+#         cve_info['privileges_required'] = traduire_en_francais(str(cve_info['privileges_required']))
+#         cve_info['user_interaction'] = traduire_en_francais(str(cve_info['user_interaction']))
+#         cve_info['scope'] = traduire_en_francais(str(cve_info['scope']))
+#         cve_info['confidentiality_impact'] = traduire_en_francais(str(cve_info['confidentiality_impact']))
+#         cve_info['integrity_impact'] = traduire_en_francais(str(cve_info['integrity_impact']))
+#         cve_info['availability_impact'] = traduire_en_francais(str(cve_info['availability_impact']))
+#         cve_info['descriptions'] = traduire_en_francais(str(cve_info['descriptions']))
 
-    return cve_list
+#     return cve_list
 
 #################################################################################
 #                              MISE EN FORME
 #################################################################################
 
-def mettre_majuscule_initiale(chaine):
-    # Convertir la chaîne en minuscules
-    chaine_minuscules = chaine.lower()
-    # Mettre en majuscule la première lettre
-    chaine_majuscule_initiale = chaine_minuscules.capitalize()
-    return chaine_majuscule_initiale
+# def mettre_majuscule_initiale(chaine):
+#     # Convertir la chaîne en minuscules
+#     chaine_minuscules = chaine.lower()
+#     # Mettre en majuscule la première lettre
+#     chaine_majuscule_initiale = chaine_minuscules.capitalize()
+#     return chaine_majuscule_initiale
 
-def mettre_majuscule_initiale_tout(cve_list):
-    for cve_info in cve_list:
-        cve_info['base_severity'] = mettre_majuscule_initiale(str(cve_info['base_severity']))
-        cve_info['attack_vector'] = mettre_majuscule_initiale(str(cve_info['attack_vector']))
-        cve_info['attack_complexity'] = mettre_majuscule_initiale(str(cve_info['attack_complexity']))
-        cve_info['privileges_required'] = mettre_majuscule_initiale(str(cve_info['privileges_required']))
-        cve_info['user_interaction'] = mettre_majuscule_initiale(str(cve_info['user_interaction']))
-        cve_info['scope'] = mettre_majuscule_initiale(str(cve_info['scope']))
-        cve_info['confidentiality_impact'] = mettre_majuscule_initiale(str(cve_info['confidentiality_impact']))
-        cve_info['integrity_impact'] = mettre_majuscule_initiale(str(cve_info['integrity_impact']))
-        cve_info['availability_impact'] = mettre_majuscule_initiale(str(cve_info['availability_impact']))
-        cve_info['descriptions'] = mettre_majuscule_initiale(str(cve_info['descriptions']))
+# def mettre_majuscule_initiale_tout(cve_list):
+#     for cve_info in cve_list:
+#         cve_info['base_severity'] = mettre_majuscule_initiale(str(cve_info['base_severity']))
+#         cve_info['attack_vector'] = mettre_majuscule_initiale(str(cve_info['attack_vector']))
+#         cve_info['attack_complexity'] = mettre_majuscule_initiale(str(cve_info['attack_complexity']))
+#         cve_info['privileges_required'] = mettre_majuscule_initiale(str(cve_info['privileges_required']))
+#         cve_info['user_interaction'] = mettre_majuscule_initiale(str(cve_info['user_interaction']))
+#         cve_info['scope'] = mettre_majuscule_initiale(str(cve_info['scope']))
+#         cve_info['confidentiality_impact'] = mettre_majuscule_initiale(str(cve_info['confidentiality_impact']))
+#         cve_info['integrity_impact'] = mettre_majuscule_initiale(str(cve_info['integrity_impact']))
+#         cve_info['availability_impact'] = mettre_majuscule_initiale(str(cve_info['availability_impact']))
+#         cve_info['descriptions'] = mettre_majuscule_initiale(str(cve_info['descriptions']))
 
+#     for cve_info in cve_list:
+#         if cve_info['base_severity'] == 'Haut':
+#             cve_info['base_severity'] = "Élevée"
+
+#         if cve_info['attack_complexity'] == 'Haut':
+#             cve_info['attack_complexity'] = "Élevée"
+        
+#         if cve_info['privileges_required'] == 'Haut':
+#             cve_info['privileges_required'] = "Élevés"
+
+#         if cve_info['user_interaction'] == 'Aucun':
+#             cve_info['user_interaction'] = "Aucune"
+
+#         if cve_info['confidentiality_impact'] == 'Haut':
+#             cve_info['confidentiality_impact'] = "Élevée"
+
+#         if cve_info['integrity_impact'] == 'Haut':
+#             cve_info['integrity_impact'] = "Élevée"
+        
+#         if cve_info['availability_impact'] == 'Haut':
+#             cve_info['availability_impact'] = "Élevée"
+
+#         if cve_info['scope'] == 'Unchanged':
+#             cve_info['scope'] = "Inchangé"
+        
+#         if cve_info['privileges_required'] == 'None':
+#             cve_info['privileges_required'] = "Aucuns"
+
+#         if cve_info['user_interaction'] == 'None':
+#             cve_info['user_interaction'] = "Aucune"
+
+#     return cve_list
+
+
+def trad(cve_list):
     for cve_info in cve_list:
-        if cve_info['base_severity'] == 'Haut':
+        if cve_info['attack_vector'] == 'NETWORK':
+            cve_info['attack_vector'] = "Réseau"
+        elif cve_info['attack_vector'] == 'LOCAL':
+            cve_info['attack_vector'] = "Local"
+        elif cve_info['attack_vector'] == 'PHYSICAL':
+            cve_info['attack_vector'] = "Réseau"
+        elif cve_info['attack_vector'] == 'ADJACENT NETWORK':
+            cve_info['attack_vector'] = "Réseau adjacent"
+
+        if cve_info['base_severity'] == 'HIGH':
             cve_info['base_severity'] = "Élevée"
 
-        if cve_info['attack_complexity'] == 'Haut':
+        if cve_info['attack_complexity'] == 'HIGH':
             cve_info['attack_complexity'] = "Élevée"
+        elif cve_info['attack_complexity'] == 'LOW':
+            cve_info['attack_complexity'] = "Faible"
         
-        if cve_info['privileges_required'] == 'Haut':
+        if cve_info['privileges_required'] == 'HIGH':
             cve_info['privileges_required'] = "Élevés"
+        elif cve_info['privileges_required'] == 'LOW':
+            cve_info['privileges_required'] = 'Faible'
+        elif cve_info['privileges_required'] == 'NONE':
+            cve_info['privileges_required'] = 'Aucuns'
 
-        if cve_info['user_interaction'] == 'Aucun':
+        if cve_info['user_interaction'] == 'NONE':
             cve_info['user_interaction'] = "Aucune"
+        elif cve_info['user_interaction'] == 'REQUIRED':
+            cve_info['user_interaction'] = 'Requise'
 
-        if cve_info['confidentiality_impact'] == 'Haut':
-            cve_info['confidentiality_impact'] = "Élevée"
-
-        if cve_info['integrity_impact'] == 'Haut':
-            cve_info['integrity_impact'] = "Élevée"
-        
-        if cve_info['availability_impact'] == 'Haut':
-            cve_info['availability_impact'] = "Élevée"
-
-        if cve_info['scope'] == 'Unchanged':
+        if cve_info['scope'] == 'UNCHANGED':
             cve_info['scope'] = "Inchangé"
-        
-        if cve_info['privileges_required'] == 'None':
-            cve_info['privileges_required'] = "Aucuns"
+        elif cve_info['scope'] == 'CHANGED':
+            cve_info['scope'] = "Modifié"
 
-        if cve_info['user_interaction'] == 'None':
-            cve_info['user_interaction'] = "Aucune"
+        if cve_info['confidentiality_impact'] == 'HIGH':
+            cve_info['confidentiality_impact'] = "Élevée"
+        elif cve_info['confidentiality_impact'] == 'LOW':
+            cve_info['confidentiality_impact'] = 'Faible'
+        elif cve_info['confidentiality_impact'] == 'NONE':
+            cve_info['confidentiality_impact'] = 'Aucun'
+
+        if cve_info['integrity_impact'] == 'HIGH':
+            cve_info['integrity_impact'] = "Élevée"
+        elif cve_info['integrity_impact'] == 'LOW':
+            cve_info['integrity_impact'] = 'Faible'
+        elif cve_info['integrity_impact'] == 'NONE':
+            cve_info['integrity_impact'] = 'Aucun'
+        
+        if cve_info['availability_impact'] == 'HIGH':
+            cve_info['availability_impact'] = "Élevée"
+        elif cve_info['availability_impact'] == 'LOW':
+            cve_info['availability_impact'] = 'Faible'
+        elif cve_info['availability_impact'] == 'NONE':
+            cve_info['availability_impact'] = 'Aucun'
+
+        if cve_info['base_severity'] == 'HIGH':
+            cve_info['base_severity'] = "Élevée"
+        elif cve_info['base_severity'] == 'CRITICAL':
+            cve_info['base_severity'] = 'Critique'
 
     return cve_list
+
 
 #################################################################################
 #                              PLAGE HORAIRE
@@ -599,7 +665,8 @@ def main():
     #cve_list = traduire_donnees_en_francais(cve_list)
 
     # mise en forme des valeurs
-    cve_list = mettre_majuscule_initiale_tout(cve_list)
+    #cve_list = mettre_majuscule_initiale_tout(cve_list)
+    cve_list = trad(cve_list)
 
     # création du powerpoint
     powerpoint(cve_list, start_date2, end_date2)
