@@ -3,8 +3,9 @@ import datetime
 from urllib.parse import quote
 import time    
 from bs4 import BeautifulSoup
-import re
+# import re
 
+import json
 
 from pptx import Presentation
 from pptx.util import Pt
@@ -12,7 +13,7 @@ from pptx.dml.color import RGBColor
 from pptx.util import Pt, Inches  # Import the Inches function
 import copy
 
-from googletrans import Translator
+# from googletrans import Translator
 
 from itertools import cycle
 from shutil import get_terminal_size
@@ -24,7 +25,7 @@ from sys import stdout
 #                                 ANIMATION
 #################################################################################
 
-class Loader:
+class Loader: # pour faire joli quand on le lance manuellement
     def __init__(self, desc="Tentative de connexion ", end="", timeout=0.1):
         self.desc = desc
         self.end = end
@@ -66,7 +67,7 @@ class Loader:
 #                                 API CALL
 #################################################################################
 
-def make_api_request(url, max_attempts=5):
+def make_api_request(url, max_attempts=5): # CALL API NIST (url à renseigner en arg)
     loader = Loader()
     loader_thread = Thread(target=loader.start, daemon=True)
     loader_thread.start()
@@ -91,27 +92,64 @@ def make_api_request(url, max_attempts=5):
             print(f"Impossible de se connecter à l'API après {max_attempts} tentatives. Veuillez réessayer plus tard.")
             exit()
 
-
-def scrape_website(cve_id):
-    url = f"https://nvd.nist.gov/vuln/detail/{cve_id}"
+def scrape_composants(cve_id): # scraping pour récupérer le produit et les versions
     try:
+        url = f"https://cveawg.mitre.org/api/cve/{cve_id}"
+
         response = requests.get(url)
         response.raise_for_status()
-        soup = BeautifulSoup(response.text, 'html.parser')
-        target_div = soup.find('div', class_='col-lg-3 col-md-5 col-sm-12')
-        content = target_div.text.strip()
+        
+        # Charger le contenu JSON
+        data = json.loads(response.text)
+        
+        # Accéder à la clé "containers" pour obtenir les informations sur les produits affectés
+        containers = data.get('containers', {}).get('cna', {}).get('affected', [])
+        
+        # Créer des ensembles (set) vides pour stocker temporairement les informations uniques sur les fournisseurs
+        unique_vendors = set()
+        products = []
+        all_versions = []
+        
+        for container in containers:
+            vendor = container.get('vendor')
+            product = container.get('product')
+            versions = container.get('versions')
+            
+            # Ajouter le fournisseur dans l'ensemble des fournisseurs uniques
+            unique_vendors.add(vendor)
+            
+            # Enregistrer les informations de chaque produit
+            products.append(product)
+            all_versions.extend(versions)
+        
+        # Convertir l'ensemble des fournisseurs uniques en liste
+        vendors = list(unique_vendors)
+        
+        return vendors, products, all_versions
 
-        pattern = r"Source:\s+(.+)"
-        match = re.search(pattern, content)
-        source_info = match.group(1)
+    except Exception as e:
+        print(f"Une erreur s'est produite : {e}")
+        return None, None, None
 
-        return  source_info
-    except requests.exceptions.RequestException as e:
-        print("Error:", e)
+def affichage_products(products, versions): # Mise en forme des versions et produits
+    composants = ""
+    try:
+        for i in range(len(products)):
+            version_info = versions[i]
+            less_than_version = version_info.get('lessThan')
+            version = version_info.get('version')
+            
+            # Utiliser 'lessThan' s'il existe, sinon utiliser 'version'
+            version_to_use = less_than_version if less_than_version is not None else version
+            
+            composants = composants + f"{products[i]} anterieur à {version_to_use}, "
+        composants = composants[:-2]
+        return composants
+
+    except Exception as e:
+        print(f"Une erreur s'est produite : {e}")
         return None
-    except AttributeError:
-        print("Div not found or website structure changed.")
-        return None
+
 
 #################################################################################
 #                                    CVE
@@ -119,17 +157,11 @@ def scrape_website(cve_id):
 
 def CVE(start_date, end_date):
 
-    # Encoder les caractères spéciaux dans les dates
-
-
     # URL de l'API du NIST pour les CVE avec les dates de début et de fin spécifiées
     # url = f'https://services.nvd.nist.gov/rest/json/cves/2.0/?lastModStartDate={encoded_start_date}&lastModEndDate={encoded_end_date}'
     url = f'https://services.nvd.nist.gov/rest/json/cves/2.0/?pubStartDate={start_date}&pubEndDate={end_date}'
 
-    # Nombre maximal de tentatives
-
     data = make_api_request(url)
-
 
     if len(data) != 0:
         cve_items = data['vulnerabilities']
@@ -138,20 +170,11 @@ def CVE(start_date, end_date):
         # Parcourir chaque CVE et extraire les informations
         for cve_item in cve_items:
 
-            #################
-            # Récupération des inforamtions de base
-            #################
-
-            cve_id = cve_item['cve']['id']
             vuln_status = cve_item['cve']['vulnStatus']
-            published = cve_item['cve']['published']
-            lastModified = cve_item['cve']['lastModified']
-            description = cve_item['cve']['descriptions'][0]['value']
-
-            
+            cve_id = cve_item['cve']['id']
 
             severity = None
-            for i in range(1, 100): # je recupere la severity de la CVE
+            for i in range(1, 35): # je recupere la severity de la CVE
                 key = f'cvssMetricV{i}'
                 if key in cve_item['cve']['metrics']:
                     cve_metrics = cve_item['cve']['metrics'][key][0]
@@ -175,15 +198,67 @@ def CVE(start_date, end_date):
             # Tri des CVE, ne prends que les CVE avec plus de 8 de score et des status autres que Rejected et modified (qui sont les CVE non acceptés ou doublons par rapport à une ancienne)
             #################
 
-            if (severity is not None and severity < 8) or vuln_status == "Rejected" or vuln_status == "Modified" :
+            # ici 2 solutions soit on a une severity, soit pas, donc on va récupérer toutes les CVE
+            # qui ont une severity au dessus de 8 ou qui est NONE
+
+            # entre 7 et 8 et pas les None
+            # if (severity is None) or (severity is not None and severity < 7 or severity > 8) or vuln_status == "Rejected" or vuln_status == "Modified":
+
+            if (severity is not None and severity < 8) or vuln_status == "Rejected" or vuln_status == "Modified":
                 print(f"Skipping CVE {cve_id} due to low severity or rejected/modified status")
             else:
-                produit = scrape_website(cve_id)
+                #################
+                # Récupération des inforamtions de base
+                #################
+     
+                published = cve_item['cve']['published']
+                lastModified = cve_item['cve']['lastModified']
+                description = cve_item['cve']['descriptions'][0]['value']
+                
+                #################
+                # source    
+                #################
+                try:
+                    source = cve_item['cve']['references'][0]['url']
+                except Exception as e:
+                    source = None
 
-                for i in range(1, 100): # Essayer différentes clés pour extraire le baseScore
+                try:
+                    source2 = cve_item['cve']['references'][1]['url']
+                except Exception as e:
+                    source2 = None
+                
+                try:
+                    # Essayer d'accéder à 'attackVector' dans cve_item['cve']['metrics'][key][0]
+                    source3 = cve_item['cve']['references'][2]['url']
+                except Exception as e:
+                    source3 = None
+                
+                #produit = scrape_website(cve_id) Scrap du nist directement (pas dingue)
+                
+                #scrpe des produits sur CVE.com
+                produit, products, versions = scrape_composants(cve_id)
+                composants = affichage_products(products, versions)
+
+                #initialisation des variables et elles se reinitialisent entre chaque CVE
+
+                vector_string = None
+                attack_vector = None
+                attack_complexity = None
+                privileges_required = None
+                user_interaction = None
+                scope = None
+                confidentiality_impact = None
+                integrity_impact = None
+                availability_impact = None
+                base_severity = None
+
+                for i in range(1, 35): # Essayer différentes clés pour extraire le baseScore
                     key = f'cvssMetricV{i}'  # Construire la clé correspondante
                     if key in cve_item['cve']['metrics']:
                         cve_metrics = cve_item['cve']['metrics'][key][0]
+
+                        # TODO UN BOUCLE PARCEQUE LA C'EST IMMONDE EN DESSOUS
                         
                         #################
                         # vectorString
@@ -191,11 +266,11 @@ def CVE(start_date, end_date):
                         try:
                             # Essayer d'accéder à 'vectorString' dans cve_item['cve']['metrics'][key][0]['cvssData']
                             vector_string = cve_metrics['vectorString']
-                        except KeyError:
+                        except Exception as e:
                             try:
                                 # Essayer d'accéder à 'attackVector' dans cve_item['cve']['metrics'][key][0]['cvssData']
                                 vector_string = cve_metrics['cvssData']['vectorString']
-                            except KeyError:
+                            except Exception as e:
                                 # Si 'attackVector' n'existe pas, définir attack_vector comme None
                                 vector_string = None
 
@@ -324,30 +399,24 @@ def CVE(start_date, end_date):
                             except KeyError:
                                 # Si 'attackVector' n'existe pas, définir attack_vector comme None
                                 base_severity = None
-
-                        #################
-                        # source    
-                        #################
-                        try:
-                            source = cve_item['cve']['references'][0]['url']
-                        except Exception as e:
-                            source = None
-
-                        try:
-                            source2 = cve_item['cve']['references'][1]['url']
-                        except Exception as e:
-                            source2 = None
-                        
-                        try:
-                            # Essayer d'accéder à 'attackVector' dans cve_item['cve']['metrics'][key][0]
-                            source3 = cve_item['cve']['references'][2]['url']
-                        except Exception as e:
-                            source3 = None
-
-                # Store all extracted information in a dictionary
+                    
+                # mise en forme rapide a changer c'est vraiment pas beau
+                try: # parfois produit est None alors qu'il devrait pas ce grand fou mais osef on le rempli si il est pas content
+                    if produit[0] == 'n/a':
+                        produit[0] = ""
+                except Exception as e:
+                    if produit == None:
+                        produit = ['']  
                 
+                if composants == 'None':
+                    composants = ""
+
+                if composants == 'n/a anterieur à n/a':
+                    composants = ""
+
+                # Remplir le tableau cve_info
                 cve_info = {
-                'produit': produit,
+                'produit': produit[0],
                 'cve_id': cve_id,
                 'published': published,
                 'lastModified': lastModified,
@@ -365,12 +434,15 @@ def CVE(start_date, end_date):
                 'descriptions': description,
                 'source' : source,
                 'source2' : source2,
-                'source3' : source3
+                'source3' : source3,
+                'composants' : composants
 
                 }
 
+                #ajouter la ligne au tableau
                 cve_list.append(cve_info)
-                                   
+
+        # on print (dans un soucis de debug uniquement c'est inutile autrement)                          
         for cve_info in cve_list:
 
             print(f"CVE ID: {cve_info['cve_id']}")
@@ -394,7 +466,6 @@ def CVE(start_date, end_date):
             print(f"Descriptions: {cve_info['descriptions']}")
             print(f"Source: {cve_info['source']}")
             print()
-
     
     else:
         print(f'Aucune CVE trouvée pour la plage de dates spécifiée.')
@@ -424,8 +495,8 @@ def powerpoint(cve_list, start_date, end_date):
 
         cve_list[diapo_index - 1]['source2'], cve_list[diapo_index - 1]['source3'] = source_forme(cve_list[diapo_index - 1]['source2'], cve_list[diapo_index - 1]['source3'])
         
-        cell_coords = [(2, 2), (3, 2), (4, 2), (5, 2), (2, 5), (3, 5), (4, 5), (5, 5), (7, 1), (10, 1)] 
-        cell_values = [cve_list[diapo_index - 1]['attack_vector'], cve_list[diapo_index - 1]['attack_complexity'], cve_list[diapo_index - 1]['privileges_required'], cve_list[diapo_index - 1]['user_interaction'], cve_list[diapo_index - 1]['scope'], cve_list[diapo_index - 1]['confidentiality_impact'], cve_list[diapo_index - 1]['integrity_impact'], cve_list[diapo_index - 1]['availability_impact'], cve_list[diapo_index - 1]['descriptions'], f"{str(cve_list[diapo_index - 1]['source'])}\n{cve_list[diapo_index - 1]['source2']}\n{cve_list[diapo_index - 1]['source3']}"]  
+        cell_coords = [(2, 2), (3, 2), (4, 2), (5, 2), (2, 5), (3, 5), (4, 5), (5, 5), (7, 1), (10, 1), (6,1)] 
+        cell_values = [cve_list[diapo_index - 1]['attack_vector'], cve_list[diapo_index - 1]['attack_complexity'], cve_list[diapo_index - 1]['privileges_required'], cve_list[diapo_index - 1]['user_interaction'], cve_list[diapo_index - 1]['scope'], cve_list[diapo_index - 1]['confidentiality_impact'], cve_list[diapo_index - 1]['integrity_impact'], cve_list[diapo_index - 1]['availability_impact'], cve_list[diapo_index - 1]['descriptions'], f"{str(cve_list[diapo_index - 1]['source'])}\n{cve_list[diapo_index - 1]['source2']}\n{cve_list[diapo_index - 1]['source3']}", cve_list[diapo_index - 1]['composants']]  
 
         for i in range(len(cell_coords)):
             modify_table_cell_black(slide, cell_coords[i], cell_values[i])
@@ -539,88 +610,73 @@ def modify_table_cell_white(slide, cell_coords, cell_value):
     run.font.bold = True  # Pour mettre le texte en gras
     run.font.color.rgb = RGBColor(255, 255, 255)  # Pour mettre le texte en blanc (255, 255, 255 correspond au blanc en RGB)
 
-
-#################################################################################
-#                                 TRADUCTION
-#################################################################################
-
-def traduire_en_francais(texte):
-    translator = Translator()
-    try:
-        traduction = translator.translate(texte, src='en', dest='fr')
-        return traduction.text
-    except:
-        return texte
-
-def traduire_donnees_en_francais(cve_list):
-    for cve_info in cve_list:
-        cve_info['base_severity'] = traduire_en_francais(str(cve_info['base_severity']))
-        cve_info['attack_vector'] = traduire_en_francais(str(cve_info['attack_vector']))
-        cve_info['attack_complexity'] = traduire_en_francais(str(cve_info['attack_complexity']))
-        cve_info['privileges_required'] = traduire_en_francais(str(cve_info['privileges_required']))
-        cve_info['user_interaction'] = traduire_en_francais(str(cve_info['user_interaction']))
-        cve_info['scope'] = traduire_en_francais(str(cve_info['scope']))
-        cve_info['confidentiality_impact'] = traduire_en_francais(str(cve_info['confidentiality_impact']))
-        cve_info['integrity_impact'] = traduire_en_francais(str(cve_info['integrity_impact']))
-        cve_info['availability_impact'] = traduire_en_francais(str(cve_info['availability_impact']))
-        cve_info['descriptions'] = traduire_en_francais(str(cve_info['descriptions']))
-
-    return cve_list
-
 #################################################################################
 #                              MISE EN FORME
 #################################################################################
 
-def mettre_majuscule_initiale(chaine):
-    # Convertir la chaîne en minuscules
-    chaine_minuscules = chaine.lower()
-    # Mettre en majuscule la première lettre
-    chaine_majuscule_initiale = chaine_minuscules.capitalize()
-    return chaine_majuscule_initiale
-
-def mettre_majuscule_initiale_tout(cve_list):
+def trad_vectors(cve_list):
+    # oupsi j'ai glissé, c'est vraiment pas beau tout ça, grosse dédicasse à la personne qui lit ce code
+    # je suis désolé, partie à revoir
     for cve_info in cve_list:
-        cve_info['base_severity'] = mettre_majuscule_initiale(str(cve_info['base_severity']))
-        cve_info['attack_vector'] = mettre_majuscule_initiale(str(cve_info['attack_vector']))
-        cve_info['attack_complexity'] = mettre_majuscule_initiale(str(cve_info['attack_complexity']))
-        cve_info['privileges_required'] = mettre_majuscule_initiale(str(cve_info['privileges_required']))
-        cve_info['user_interaction'] = mettre_majuscule_initiale(str(cve_info['user_interaction']))
-        cve_info['scope'] = mettre_majuscule_initiale(str(cve_info['scope']))
-        cve_info['confidentiality_impact'] = mettre_majuscule_initiale(str(cve_info['confidentiality_impact']))
-        cve_info['integrity_impact'] = mettre_majuscule_initiale(str(cve_info['integrity_impact']))
-        cve_info['availability_impact'] = mettre_majuscule_initiale(str(cve_info['availability_impact']))
-        cve_info['descriptions'] = mettre_majuscule_initiale(str(cve_info['descriptions']))
+        if cve_info['attack_vector'] == 'NETWORK':
+            cve_info['attack_vector'] = "Réseau"
+        elif cve_info['attack_vector'] == 'LOCAL':
+            cve_info['attack_vector'] = "Local"
+        elif cve_info['attack_vector'] == 'PHYSICAL':
+            cve_info['attack_vector'] = "Réseau"
+        elif cve_info['attack_vector'] == 'ADJACENT NETWORK':
+            cve_info['attack_vector'] = "Réseau adjacent"
 
-    for cve_info in cve_list:
-        if cve_info['base_severity'] == 'Haut':
+        if cve_info['base_severity'] == 'HIGH':
             cve_info['base_severity'] = "Élevée"
 
-        if cve_info['attack_complexity'] == 'Haut':
+        if cve_info['attack_complexity'] == 'HIGH':
             cve_info['attack_complexity'] = "Élevée"
+        elif cve_info['attack_complexity'] == 'LOW':
+            cve_info['attack_complexity'] = "Faible"
         
-        if cve_info['privileges_required'] == 'Haut':
+        if cve_info['privileges_required'] == 'HIGH':
             cve_info['privileges_required'] = "Élevés"
+        elif cve_info['privileges_required'] == 'LOW':
+            cve_info['privileges_required'] = 'Faible'
+        elif cve_info['privileges_required'] == 'NONE':
+            cve_info['privileges_required'] = 'Aucuns'
 
-        if cve_info['user_interaction'] == 'Aucun':
+        if cve_info['user_interaction'] == 'NONE':
             cve_info['user_interaction'] = "Aucune"
+        elif cve_info['user_interaction'] == 'REQUIRED':
+            cve_info['user_interaction'] = 'Requise'
 
-        if cve_info['confidentiality_impact'] == 'Haut':
-            cve_info['confidentiality_impact'] = "Élevée"
-
-        if cve_info['integrity_impact'] == 'Haut':
-            cve_info['integrity_impact'] = "Élevée"
-        
-        if cve_info['availability_impact'] == 'Haut':
-            cve_info['availability_impact'] = "Élevée"
-
-        if cve_info['scope'] == 'Unchanged':
+        if cve_info['scope'] == 'UNCHANGED':
             cve_info['scope'] = "Inchangé"
-        
-        if cve_info['privileges_required'] == 'None':
-            cve_info['privileges_required'] = "Aucuns"
+        elif cve_info['scope'] == 'CHANGED':
+            cve_info['scope'] = "Modifié"
 
-        if cve_info['user_interaction'] == 'None':
-            cve_info['user_interaction'] = "Aucune"
+        if cve_info['confidentiality_impact'] == 'HIGH':
+            cve_info['confidentiality_impact'] = "Élevée"
+        elif cve_info['confidentiality_impact'] == 'LOW':
+            cve_info['confidentiality_impact'] = 'Faible'
+        elif cve_info['confidentiality_impact'] == 'NONE':
+            cve_info['confidentiality_impact'] = 'Aucun'
+
+        if cve_info['integrity_impact'] == 'HIGH':
+            cve_info['integrity_impact'] = "Élevée"
+        elif cve_info['integrity_impact'] == 'LOW':
+            cve_info['integrity_impact'] = 'Faible'
+        elif cve_info['integrity_impact'] == 'NONE':
+            cve_info['integrity_impact'] = 'Aucun'
+        
+        if cve_info['availability_impact'] == 'HIGH':
+            cve_info['availability_impact'] = "Élevée"
+        elif cve_info['availability_impact'] == 'LOW':
+            cve_info['availability_impact'] = 'Faible'
+        elif cve_info['availability_impact'] == 'NONE':
+            cve_info['availability_impact'] = 'Aucun'
+
+        if cve_info['base_severity'] == 'HIGH':
+            cve_info['base_severity'] = "Élevée"
+        elif cve_info['base_severity'] == 'CRITICAL':
+            cve_info['base_severity'] = 'Critique'
 
     return cve_list
 
@@ -640,25 +696,26 @@ def plage():
     hier = aujourdhui - un_jour
 
     # Extraire le jour en tant qu'entier
-    jour_hier = hier.day
+    # Obtenir la date d'aujourd'hui
+    aujourdhui = datetime.datetime.now()
 
-    A = aujourdhui.year
-    M = aujourdhui.month
-    J = jour_hier
+    # Obtenir la date d'hier
+    hier = aujourdhui - datetime.timedelta(days=1)
+
+    # Définir les heures, minutes et secondes pour les deux dates
     H = 9
-    MIN = 00
-    S = 00
+    MIN = 0
+    S = 0
 
-    A2 = aujourdhui.year
-    M2 = aujourdhui.month
-    J2 = aujourdhui.day
     H2 = 8
     MIN2 = 59
     S2 = 59
 
-    start_datetime = datetime.datetime(A, M, J, H, MIN, S)
-    end_datetime = datetime.datetime(A2, M2, J2, H2, MIN2, S2)
+    # Construire les objets datetime pour hier à 9h et aujourd'hui à 8h59
+    start_datetime = datetime.datetime(hier.year, hier.month, hier.day, H, MIN, S)
+    end_datetime = datetime.datetime(aujourdhui.year, aujourdhui.month, aujourdhui.day, H2, MIN2, S2)
 
+    # Convertir les objets datetime en format de chaîne souhaité
     start_date = start_datetime.strftime('%Y-%m-%dT%H:%M:%S.000%z')
     end_date = end_datetime.strftime('%Y-%m-%dT%H:%M:%S.000%z')
 
@@ -670,7 +727,6 @@ def plage():
 
     return encoded_start_date, encoded_end_date, start_date2, end_date2
 
-
 def main():
     #definir les dates de début et de fin
     start_date, end_date, start_date2, end_date2 = plage()
@@ -678,11 +734,8 @@ def main():
     # récupérer les CVE dans un tableau
     cve_list = CVE(start_date, end_date)
 
-    # Traduire tout les champs en anglais
-    #cve_list = traduire_donnees_en_francais(cve_list)
-
     # mise en forme des valeurs
-    cve_list = mettre_majuscule_initiale_tout(cve_list)
+    cve_list = trad_vectors(cve_list)
 
     # création du powerpoint
     powerpoint(cve_list, start_date2, end_date2)
